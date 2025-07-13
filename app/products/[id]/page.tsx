@@ -9,11 +9,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 
-type Props = {
-  params: { id: string }
-}
-
-const ProductDetails = async ({ params: { id } }: Props) => {
+export default async function ProductDetails({ params }: { params: { id: string } }) {
+  const id = params.id;
   const product: Product = await getProductById(id);
   
 
@@ -196,5 +193,3 @@ const ProductDetails = async ({ params: { id } }: Props) => {
     </div>
   )
 }
-
-export default ProductDetails
