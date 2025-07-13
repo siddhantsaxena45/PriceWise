@@ -39,10 +39,11 @@ export function extractCurrency(element: any) {
   return currencyText ? currencyText : "";
 }
 export function extractReviewsCount(element: any): number {
-  const text = element.text().trim(); // (26)
-  const match = text.match(/\d+/);    // Extract digits
-  return match ? parseInt(match[0], 10) : 0;
+  const text = element.text().trim().replace(/[(),]/g, ''); // Remove () and comma
+  const num = parseInt(text, 10);
+  return isNaN(num) ? 0 : num;
 }
+
 export function extractStars($: any) {
   const starsText = $('span.a-icon-alt').first().text().trim(); // e.g., "4.0 out of 5 stars"
   const match = starsText.match(/(\d+(\.\d+)?)/); // extracts 4.0
