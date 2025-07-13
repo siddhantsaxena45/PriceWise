@@ -3,8 +3,10 @@ import https from "https";
 
 import * as cheerio from "cheerio"
 import { extractCategory, extractCurrency, extractDescription, extractPrice, extractReviewsCount, extractStars } from "../utlis";
+
 export async function scrapeAmazonProduct(url: string) {
-  if (!url) return
+  if (!url) return null; // Return null instead of undefined
+  
   const username = String(process.env.BRIGHT_DATA_USERNAME);
   const password = String(process.env.BRIGHT_DATA_PASSWORD);
   const port = 33335
@@ -21,7 +23,7 @@ export async function scrapeAmazonProduct(url: string) {
       },
     },
     httpsAgent: new https.Agent({
-      rejectUnauthorized: false, // optional: suppress SSL cert errors
+      rejectUnauthorized: false,
     }),
     headers: {
       "User-Agent":
@@ -34,7 +36,7 @@ export async function scrapeAmazonProduct(url: string) {
     const $ = cheerio.load(response.data);
     const title = $("#productTitle").text().trim();
 
-    const currentPrice = extractPrice(
+    const currentPriceRaw = extractPrice(
       $(".priceToPay .a-offscreen"),
       $(".priceToPay .a-price-whole"),
       $("#tp_price_block_total_price_in .a-price-whole"),
@@ -42,50 +44,70 @@ export async function scrapeAmazonProduct(url: string) {
       $(".a-price .a-price-whole")
     );
 
-
-    const originalPrice = extractPrice(
+    const originalPriceRaw = extractPrice(
       $(".a-text-price .a-offscreen")
     );
+
+    // Convert to numbers and validate
+    const currentPrice = parseFloat(currentPriceRaw?.replace(/[^\d.-]/g, '') || '0');
+    const originalPrice = parseFloat(originalPriceRaw?.replace(/[^\d.-]/g, '') || '0');
+
+    // If no valid prices found, return null
+    if (isNaN(currentPrice) && isNaN(originalPrice)) {
+      console.warn(`No valid prices found for product: ${url}`);
+      return null;
+    }
+
+    // Use the valid price or fallback
+    const validCurrentPrice = !isNaN(currentPrice) && currentPrice > 0 ? currentPrice : originalPrice;
+    const validOriginalPrice = !isNaN(originalPrice) && originalPrice > 0 ? originalPrice : currentPrice;
+
     const outOfStock = $("#availability").text().toLowerCase().includes("unavailable");
 
     const images = $("#landingImage").attr("data-a-dynamic-image") || $("#imgBlkFront").attr("data-a-dynamic-image") || '{}';
-    const imageUrls = Object.keys(JSON.parse(images));
+    let imageUrls: string[] = [];
+    
+    try {
+      imageUrls = Object.keys(JSON.parse(images));
+    } catch (e) {
+      console.warn('Failed to parse images JSON');
+      imageUrls = [];
+    }
 
     const currency = extractCurrency($(".a-price-symbol"));
 
-    const discountText = $('.savingsPercentage').first().text().trim(); // e.g. "-31%"
-    const discountRate = discountText.replace(/[-%]/g, ''); // "31"
+    const discountText = $('.savingsPercentage').first().text().trim();
+    const discountRate = discountText.replace(/[-%]/g, '');
 
     const reviewsCount = extractReviewsCount($('#acrCustomerReviewText'));
     const stars = extractStars($);
-
-    const description = extractDescription($)
-const category = extractCategory($('ul.a-unordered-list.a-horizontal.a-size-small'));
+    const description = extractDescription($);
+    const category = extractCategory($('ul.a-unordered-list.a-horizontal.a-size-small'));
 
     // Construct data object with scraped information
     const data = {
       url,
       currency: currency || '$',
-      image: imageUrls[0],
-      title,
-      currentPrice: Number(currentPrice) || Number(originalPrice),
-      originalPrice: Number(originalPrice) || Number(currentPrice),
+      image: imageUrls[0] || '',
+      title: title || 'Unknown Product',
+      currentPrice: validCurrentPrice,
+      originalPrice: validOriginalPrice,
       priceHistory: [],
-      discountRate: Number(discountRate),
-      category:category || 'category',
-      reviewsCount,
-      stars,
+      discountRate: Number(discountRate) || 0,
+      category: category || 'category',
+      reviewsCount: reviewsCount || 0,
+      stars: stars || 0,
       isOutOfStock: outOfStock,
-      description,
-      lowestPrice: Number(currentPrice) || Number(originalPrice),
-      highestPrice: Number(originalPrice) || Number(currentPrice),
-      averagePrice: Number(currentPrice) || Number(originalPrice),
+      description: description || '',
+      lowestPrice: validCurrentPrice,
+      highestPrice: validOriginalPrice,
+      averagePrice: validCurrentPrice,
     }
     
     return data;
   }
   catch (error: any) {
-    throw new Error(`Failed to scrape product: ${error.message}`)
-
+    console.error(`Failed to scrape product ${url}:`, error.message);
+    return null; // Return null instead of throwing
   }
 }
