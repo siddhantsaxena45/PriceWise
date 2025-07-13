@@ -10,10 +10,11 @@ import { redirect } from "next/navigation";
 
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-const ProductDetails = async ({ params: { id } }: Props) => {
+const ProductDetails = async ({ params }: Props) => {
+  const { id } = await params;
   const product: Product = await getProductById(id);
   
 
