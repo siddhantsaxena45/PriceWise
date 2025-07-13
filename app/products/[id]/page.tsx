@@ -123,8 +123,7 @@ const ProductDetails = async ({ params }: Props) => {
               </div>
 
               <p className="text-sm text-black opacity-50">
-                <span className="text-primary-green font-semibold">93% </span> of
-                buyers have recommeded this.
+                <span className="text-red-600 font-semibold">{product.isOutOfStock && 'Out of Stock' }</span> <span className="text-green-600 font-semibold">{!product.isOutOfStock && 'In Stock'}</span>
               </p>
             </div>
           </div>
